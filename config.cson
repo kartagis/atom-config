@@ -3,7 +3,17 @@
     telemetryConsent: "limited"
   "exception-reporting":
     userId: "f6d5bf8a-188f-4a34-ad0a-e95044da2ae2"
-  "linter-ui-default":
-    showPanel: true
+  "linter-ui-default": {}
+  "remote-ftp":
+    beta:
+      multipleHosts: true
+    connector:
+      autoUploadOnSave: "only when connected"
+    notifications:
+      enableTransfer: true
+      enableWatchFileChange: true
+    statusbar: {}
+    tree:
+      showProjectName: "hostName"
   welcome:
     showOnStartup: false
