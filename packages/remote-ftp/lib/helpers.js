@@ -14,7 +14,6 @@ export const checkPaths = (index, elem) => (elem.getPath ? elem.getPath() : '');
 export const hasProject = () => atom.project && atom.project.getPaths().length;
 export const multipleHostsEnabled = () => atom.config.get('remote-ftp.beta.multipleHosts');
 export const hasOwnProperty = ({ obj, prop }) => Object.prototype.hasOwnProperty.call(obj, prop);
-export const resizeCursor = process.platform === 'win32' ? 'ew-resize' : 'col-resize';
 export const splitPaths = path => path.replace(/^\/+/, '').replace(/\/+$/, '').split('/');
 
 export const simpleSort = (a, b) => {
@@ -156,7 +155,7 @@ export const traverseTree = (localPath, callback) => {
   if (typeof callback === 'function') callback.apply(null, [list]);
 };
 
-export const validateConfig = (data) => {
+export const validateConfig = (data, configFileName) => {
   try {
     // try to parse the json
     JSON.parse(data);
@@ -175,13 +174,13 @@ export const validateConfig = (data) => {
     }
 
     // show notification
-    atom.notifications.addError('Could not parse `.ftpconfig`', {
+    atom.notifications.addError(`Could not parse \`${configFileName}\``, {
       detail: `${error.message}`,
       dismissable: false,
     });
 
     // open .ftpconfig file and mark the faulty line
-    atom.workspace.open('.ftpconfig').then((editor) => {
+    atom.workspace.open(configFileName).then((editor) => {
       if (lineNumber === -1) return; // no line number to mark
 
       const decorationConfig = {
@@ -222,13 +221,13 @@ export const getSelectedTree = () => {
   return views.map((err, item) => $(item).view() || null).get();
 };
 
-export function checkTarget(e) {
+export function checkTarget(e, disableRoot = false) {
   const view = $(e.currentTarget).view();
   const hasProjectRoot = view.hasClass('project-root');
   const hasProjectRootHeader = $(e.target).hasClass('project-root-header');
 
   if (!view || view instanceof DirectoryView === false) return false;
-  if (hasProjectRoot && !hasProjectRootHeader) return false;
+  if (disableRoot && hasProjectRoot && !hasProjectRootHeader) return false;
 
   return true;
 }

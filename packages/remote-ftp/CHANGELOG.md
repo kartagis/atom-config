@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [2.2.0] - 2018-05-19
+
+## Changed
++ Supported .cson config file [#1140](https://github.com/icetee/remote-ftp/issues/1140)
++ Remove `resize-handle` methods
++ Adapt to new tree-view design
++ Supported Drag & Drop download, upload
++ Add `.ftpconfig.cson` name to ftpignore
+
+## Fixed
++ Keypress up/down move in folder
++ Improve the dock pane visibility [#1137](https://github.com/icetee/remote-ftp/issues/1137)
++ Asterisk problem solved [#1062](https://github.com/icetee/remote-ftp/issues/1062)
+
 ## [2.1.4] - 2018-01-06
 
 ## Changed

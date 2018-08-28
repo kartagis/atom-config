@@ -1,8 +1,8 @@
 'use babel';
 
+import { CompositeDisposable } from 'event-kit';
 import { $, ScrollView } from 'atom-space-pen-views';
 import {
-  resizeCursor,
   elapsedTime,
   resolveTree,
   getSelectedTree,
@@ -12,23 +12,12 @@ import DirectoryView from './directory-view';
 class TreeView extends ScrollView {
   static content() {
     return this.div({
-      class: 'remote-ftp-view ftptree-view-resizer tool-panel',
+      class: 'remote-ftp-view tool-panel',
     }, () => {
-      this.div({
-        class: 'scroller',
-        outlet: 'scroller',
-      }, () => {
-        this.ol({
-          class: 'ftptree-view full-menu list-tree has-collapsable-children focusable-panel',
-          tabindex: -1,
-          outlet: 'list',
-        });
-      });
-
-      this.div({
-        class: 'resize-handle',
-        outlet: 'horizontalResize',
-        style: `cursor:${resizeCursor}`, // platform specific cursor
+      this.ol({
+        class: 'ftptree-view full-menu list-tree has-collapsable-children focusable-panel',
+        tabindex: -1,
+        outlet: 'list',
       });
 
       this.div({
@@ -41,14 +30,17 @@ class TreeView extends ScrollView {
           tabindex: -1,
           outlet: 'progress',
         });
+
         this.ul({
           class: 'list',
           tabindex: -1,
           outlet: 'debug',
         });
-        return this.div({
-          class: 'resize-handle',
-          outlet: 'verticalResize',
+
+        this.span({
+          class: 'remote-ftp-info icon icon-unfold',
+          tabindex: -1,
+          outlet: 'info',
         });
       });
 
@@ -63,6 +55,7 @@ class TreeView extends ScrollView {
   initialize(storage) {
     super.initialize(storage);
 
+    this.subscriptions = new CompositeDisposable();
     this.storage = storage;
 
     // Supported for old API
@@ -94,13 +87,15 @@ class TreeView extends ScrollView {
     this.lastSelected = [];
 
     // Events
-    atom.config.onDidChange('remote-ftp.tree.enableDragAndDrop', (value) => {
-      if (value.newValue) {
-        this.createDragAndDrops();
-      } else {
-        this.disposeDragAndDrops();
-      }
-    });
+    this.subscriptions.add(
+      atom.config.onDidChange('remote-ftp.tree.enableDragAndDrop', (value) => {
+        if (value.newValue) {
+          this.createDragAndDrops();
+        } else {
+          this.disposeDragAndDrops();
+        }
+      }),
+    );
 
     atom.project.remoteftp.onDidDebug((msg) => {
       this.debug.prepend(`<li>${msg}</li>`);
@@ -173,10 +168,10 @@ class TreeView extends ScrollView {
       this.toggle();
     });
 
-    this.horizontalResize.on('dblclick', (e) => { this.resizeToFitContent(e); });
-    this.horizontalResize.on('mousedown', (e) => { this.resizeHorizontalStarted(e); });
-    this.verticalResize.on('mousedown', (e) => { this.resizeVerticalStarted(e); });
+    this.info.on('click', (e) => { this.toggleInfo(e); });
+
     this.list.on('keydown', (e) => { this.remoteKeyboardNavigation(e); });
+
     this.root.entries.on('click', 'li.entry', (e) => {
       e.stopPropagation();
       e.preventDefault();
@@ -204,24 +199,65 @@ class TreeView extends ScrollView {
     });
 
     this.getTitle = () => 'Remote';
-  }
 
-  attach() {
-    const currentSide = this.storage.data.options.treeViewSide.toLowerCase();
-    const currentDock = atom.workspace.paneContainers[currentSide];
-
-    if (typeof currentDock !== 'object') return;
-
-    const activePane = currentDock.getPanes()[0];
-    this.panel = activePane.addItem(this);
-
-    if (!currentDock.isVisible() && this.storage.data.options.treeViewShow) {
-      currentDock.toggle();
+    if (this.storage.data.options.treeViewShow) {
+      this.attach();
     }
   }
 
+  serialize() {
+    return this.storage.data;
+  }
+
+  toggleInfo() {
+    this.queue.toggleClass('active');
+
+    if (this.queue.hasClass('active')) {
+      this.info.removeClass('icon-unfold').addClass('icon-fold');
+    } else {
+      this.info.removeClass('icon-fold').addClass('icon-unfold');
+    }
+  }
+
+  getDockElems() {
+    const currentSide = this.storage.data.options.treeViewSide.toLowerCase();
+    const currentDock = atom.workspace.paneContainers[currentSide];
+
+    if (typeof currentDock !== 'object') return false;
+
+    const activePane = currentDock.getPanes()[0];
+
+    return {
+      currentSide,
+      currentDock,
+      activePane,
+    };
+  }
+
+  onDidCloseItem() {
+    this.detach();
+  }
+
+  attach() {
+    const dockElems = this.getDockElems();
+
+    if (!dockElems.activePane) return;
+
+    this.panel = dockElems.activePane.addItem(this);
+
+    if (!dockElems.currentDock.isVisible() && this.storage.data.options.treeViewShow) {
+      dockElems.currentDock.toggle();
+    }
+
+    atom.workspace.onDidDestroyPaneItem(({ item }) => {
+      if (item === this.panel) {
+        this.onDidCloseItem(this.panel);
+      }
+    });
+  }
+
   attached() {
-    //
+    this.storage.data.options.treeViewShow = true;
   }
 
   detach(...args) {
@@ -238,10 +274,12 @@ class TreeView extends ScrollView {
 
       this.panel = null;
     }
+
+    this.storage.data.options.treeViewShow = false;
   }
 
   dispose() {
-    //
+    this.subscriptions.dispose();
   }
 
   createDragAndDrops() {
@@ -278,80 +316,10 @@ class TreeView extends ScrollView {
     this.list.show();
     this.queue.show();
     this.offline.hide();
-  }
 
-  resizeVerticalStarted(e) {
-    e.preventDefault();
-
-    const $doc = $(document);
-
-    this.resizeHeightStart = this.queue.height();
-    this.resizeMouseStart = e.pageY;
-
-    $doc.on('mousemove', this.resizeVerticalView.bind(this));
-    $doc.on('mouseup', this.resizeVerticalStopped);
-  }
-
-  resizeVerticalStopped() {
-    delete this.resizeHeightStart;
-    delete this.resizeMouseStart;
-
-    const $doc = $(document);
-
-    $doc.off('mousemove', this.resizeVerticalView);
-    $doc.off('mouseup', this.resizeVerticalStopped);
-  }
-
-  resizeVerticalView(e) {
-    if (e.which !== 1) { return this.resizeVerticalStopped(); }
-
-    const delta = e.pageY - this.resizeMouseStart;
-    const height = Math.max(26, this.resizeHeightStart - delta);
-
-    this.queue.height(height);
-    this.scroller.css('bottom', `${height}px`);
-
-    return true;
-  }
-
-  resizeHorizontalStarted(e) {
-    e.preventDefault();
-
-    this.resizeWidthStart = this.width();
-    this.resizeMouseStart = e.pageX;
-
-    const $doc = $(document);
-
-    $doc.on('mousemove', this.resizeHorizontalView.bind(this));
-    $doc.on('mouseup', this.resizeHorizontalStopped);
-  }
-
-  resizeHorizontalStopped() {
-    delete this.resizeWidthStart;
-    delete this.resizeMouseStart;
-
-    const $doc = $(document);
-
-    $doc.off('mousemove', this.resizeHorizontalView);
-    $doc.off('mouseup', this.resizeHorizontalStopped);
-  }
-
-  resizeHorizontalView(e) {
-    if (e.which !== 1) { return this.resizeHorizontalStopped(); }
-
-    const delta = e.pageX - this.resizeMouseStart;
-    const width = Math.max(50, this.resizeWidthStart + delta);
-
-    this.width(width);
-
-    return true;
-  }
-
-  resizeToFitContent(e) {
-    e.preventDefault();
-
-    this.width(1);
-    this.width(this.list.outerWidth());
+    if (!atom.project.remoteftp.connector.ftp) {
+      this.info.hide();
+    }
   }
 
   remoteMultiSelect(e, current) {
@@ -435,7 +403,7 @@ class TreeView extends ScrollView {
     if (next.length >= 1) {
       if (!isMulti) current.removeClass('selected');
 
-      next.first().addClass('selected');
+      next.last().addClass('selected');
     }
   }
 
@@ -461,7 +429,7 @@ class TreeView extends ScrollView {
     if (next.length >= 1) {
       if (!isMulti) current.removeClass('selected');
 
-      next.last().addClass('selected');
+      next.first().addClass('selected');
     }
   }
 
@@ -496,13 +464,13 @@ class TreeView extends ScrollView {
     const current = this.list.find('.selected');
 
     if (current.length) {
-      const scrollerTop = this.scroller.scrollTop();
+      const scrollerTop = this.scrollTop();
       const selectedTop = current.position().top;
 
       if (selectedTop < scrollerTop - 10) {
-        this.scroller.pageUp();
-      } else if (selectedTop > scrollerTop + (this.scroller.height() - 10)) {
-        this.scroller.pageDown();
+        this.pageUp();
+      } else if (selectedTop > scrollerTop + (this.height() - 10)) {
+        this.pageDown();
       }
     }
   }

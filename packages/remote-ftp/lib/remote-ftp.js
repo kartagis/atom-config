@@ -14,6 +14,7 @@ export default {
 
   config,
   client: null,
+  coreTreeView: null,
   treeView: null,
   statusBarTile: null,
   statusBarView: null,
@@ -65,25 +66,18 @@ export default {
         this.storage.data.options.treeViewSide = 'bottom';
       }),
 
-      atom.workspace.paneContainers.left.onDidChangeVisible((visible) => {
-        if (this.storage.data.options.treeViewSide !== 'left') return;
-
-        this.storage.data.options.treeViewShow = visible;
+      atom.config.onDidChange('remote-ftp.tree.enableDragAndDrop', (value) => {
+        if (value.newValue) {
+          this.createTreeViewEvents();
+        } else {
+          this.dropTreeViewEvents();
+        }
       }),
-
-      atom.workspace.paneContainers.right.onDidChangeVisible((visible) => {
-        if (this.storage.data.options.treeViewSide !== 'right') return;
-
-        this.storage.data.options.treeViewShow = visible;
-      }),
-
-      atom.workspace.paneContainers.bottom.onDidChangeVisible((visible) => {
-        if (this.storage.data.options.treeViewSide !== 'bottom') return;
-
-        this.storage.data.options.treeViewShow = visible;
-      }),
-
     );
+
+    if (atom.config.get('remote-ftp.tree.enableDragAndDrop')) {
+      this.createTreeViewEvents();
+    }
 
     this.client.onDidConnected(() => {
       this.treeView.root.name.attr('data-name', Path.basename(this.client.root.remote));
@@ -116,12 +110,73 @@ export default {
     initCommands();
   },
 
+  createTreeViewEvents() {
+    const coreTreeViewElemDragStart = (e) => {
+      const target = e.target.querySelector('.name');
+      const localPaths = {
+        fullPath: target.getAttribute('data-path'),
+        name: target.getAttribute('data-name'),
+      };
+
+      e.dataTransfer.setData('localPaths', JSON.stringify(localPaths));
+      e.dataTransfer.effectAllowed = 'move';
+    };
+
+    const coreTreeViewElemDrop = (e) => {
+      const pathInfos = e.dataTransfer.getData('pathInfos');
+
+      if (pathInfos.length > 0) {
+        const remotePath = JSON.parse(pathInfos);
+        const newPathInfo = e.target.querySelector('span[data-path]').getAttribute('data-path');
+        const destPath = Path.join(newPathInfo, remotePath.name);
+
+        if (Object.keys(remotePath).length === 0) {
+          console.warn('Empty ', remotePath);
+        }
+
+        this.client.downloadTo(remotePath.fullPath, destPath, true, (err) => {
+          if (err) {
+            console.warn(err);
+          }
+        });
+      }
+    };
+
+    this.coreTreeViewEvents = {
+      coreTreeViewElemDragStart,
+      coreTreeViewElemDrop,
+    };
+
+    atom.packages.activatePackage('tree-view').then((treeView) => {
+      this.coreTreeView = treeView.mainModule.getTreeViewInstance();
+
+      if (typeof this.coreTreeView.element === 'undefined') {
+        return;
+      }
+
+      this.coreTreeView.element.addEventListener('dragstart', this.coreTreeViewEvents.coreTreeViewElemDragStart);
+      this.coreTreeView.element.addEventListener('drop', this.coreTreeViewEvents.coreTreeViewElemDrop);
+    });
+  },
+
+  dropTreeViewEvents() {
+    if (this.coreTreeView && this.coreTreeView.element && this.coreTreeViewEvents) {
+      this.coreTreeView.element.removeEventListener('dragstart', this.coreTreeViewEvents.coreTreeViewElemDragStart);
+      this.coreTreeView.element.removeEventListener('drop', this.coreTreeViewEvents.coreTreeViewElemDrop);
+
+      delete this.coreTreeViewEvents;
+      this.coreTreeView = null;
+    }
+  },
+
   deactivate() {
     this.subscriptions.dispose();
     this.destroyStatusBar();
 
     if (this.client) this.client.disconnect();
     if (this.treeView) this.treeView.detach();
+
+    this.dropTreeViewEvents();
 
     this.client = null;
     this.treeView = null;
