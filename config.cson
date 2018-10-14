@@ -5,8 +5,7 @@
     userId: "f6d5bf8a-188f-4a34-ad0a-e95044da2ae2"
   "linter-ui-default": {}
   "remote-ftp":
-    beta:
-      multipleHosts: true
+    beta: {}
     connector:
       autoUploadOnSave: "only when connected"
     notifications:
