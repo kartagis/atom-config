@@ -19,7 +19,7 @@
   "_resolved": "https://www.atom.io/api/packages/atom-autocomplete-php/versions/0.25.6/tarball",
   "_shasum": "04c1113ae16f917be77a4ff130e39aa88062c419",
   "_spec": "https://www.atom.io/api/packages/atom-autocomplete-php/versions/0.25.6/tarball",
-  "_where": "/private/var/folders/1_/d24wm2kn4y9_334dlqj_lhd80000gn/T/apm-install-dir-119031-57038-1l1qp0g.1yt8",
+  "_where": "/private/var/folders/1_/d24wm2kn4y9_334dlqj_lhd80000gn/T/apm-install-dir-119221-4458-pbvrna.74i7",
   "bugs": {
     "url": "https://github.com/Peekmo/atom-autocomplete-php/issues"
   },
@@ -37,11 +37,11 @@
     }
   },
   "dependencies": {
-    "atom-space-pen-views": "^2.2.0",
+    "atom-space-pen-views": "~2.0.5",
     "fuzzaldrin": "^2.1.0",
-    "jquery": "^3.3.1",
+    "jquery": "~2.1.4",
     "md5": "2.0.0",
-    "sub-atom": "^1.1.0"
+    "sub-atom": "~1.0.0"
   },
   "deprecated": false,
   "description": "Atom autocompletion plugin for PHP language",
