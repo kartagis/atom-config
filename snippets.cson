@@ -36,3 +36,12 @@
   'JSON.stringify':
     'prefix': 'str'
     'body': 'JSON.stringify($1)'
+'.text.html.php':
+    'public function':
+      'prefix': 'pubfun'
+      'body': """
+      public function ${1:foo}()
+      {
+        $2
+      }
+      """
