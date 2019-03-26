@@ -40,8 +40,8 @@
     'public function':
       'prefix': 'pubfun'
       'body': """
-      public function ${1:foo}()
+      public function ${1:foo}($2)
       {
-        $2
+        $3
       }
       """
